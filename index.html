@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>PLC RAG Chatbot</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Simple clean styling -->
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #020617;
+      color: #e5e7eb;
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
+      min-height: 100vh;
+    }
+    .app {
+      max-width: 960px;
+      width: 100%;
+      padding: 16px;
+    }
+    .card {
+      background: #020617;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      border: 1px solid #1f2937;
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 1.6rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    h1 span.logo {
+      background: #22c55e;
+      color: #022c22;
+      border-radius: 999px;
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+    p.subtitle {
+      margin-top: 4px;
+      margin-bottom: 16px;
+      color: #9ca3af;
+      font-size: 0.9rem;
+    }
+
+    .section {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: #020617;
+      border: 1px solid #111827;
+    }
+    .section-title {
+      font-size: 0.9rem;
+      color: #9ca3af;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    input[type="file"] {
+      width: 100%;
+      padding: 6px;
+      border-radius: 8px;
+      border: 1px solid #1f2937;
+      background: #020617;
+      color: #e5e7eb;
+    }
+
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 8px 16px;
+      margin-top: 8px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      background: linear-gradient(135deg, #22c55e, #14b8a6);
+      color: #022c22;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .status {
+      font-size: 0.8rem;
+      color: #a5b4fc;
+      margin-top: 4px;
+      min-height: 1.2em;
+      white-space: pre-wrap;
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .row > * {
+      flex: 1;
+    }
+
+    textarea, input[type="text"] {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid #1f2937;
+      background: #020617;
+      color: #e5e7eb;
+      resize: vertical;
+      min-height: 44px;
+      font-size: 0.95rem;
+    }
+    textarea::placeholder, input::placeholder {
+      color: #6b7280;
+    }
+
+    .answer-box {
+      background: #020617;
+      border-radius: 12px;
+      border: 1px solid #111827;
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      min-height: 80px;
+      white-space: pre-wrap;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      background: #030712;
+      border: 1px solid #1f2937;
+      color: #9ca3af;
+    }
+    .badge-ready {
+      color: #4ade80;
+    }
+    .badge-loading {
+      color: #eab308;
+    }
+    .badge-error {
+      color: #f97373;
+    }
+    code.inline {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      background: #020617;
+      padding: 1px 4px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+    }
+    .debug-context {
+      font-size: 0.8rem;
+      color: #9ca3af;
+      background: #020617;
+      border: 1px dashed #1f2937;
+      border-radius: 10px;
+      padding: 8px;
+      max-height: 180px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+    a {
+      color: #38bdf8;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+
+  <!-- pdf.js for in-browser PDF text extraction -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.js"
+          integrity="sha512-WpQnJn9kn9xZDKXwPyN4S9LQpFUpC2i6raIxAQ4KqTuc0s5Vtxq4vXcnXRcJZ3nzoAoRHzLrFLY3+JOmxoy4uA=="
+          crossorigin="anonymous"
+          referrerpolicy="no-referrer"></script>
+
+  <!-- transformers.js (Xenova) for in-browser embeddings + LLM -->
+  <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.9.0/dist/transformers.min.js"></script>
+</head>
+
+<body>
+  <div class="app">
+    <div class="card">
+      <h1>
+        <span class="logo">PLC</span>
+        PLC RAG Chatbot
+      </h1>
+      <p class="subtitle">
+        Upload your PLC PDFs (wiring, ladder logic, notes) and ask questions.
+        The bot answers <strong>only</strong> from the uploaded documents.
+      </p>
+
+      <!-- MODEL STATUS -->
+      <div class="section">
+        <div class="section-title">Model Status</div>
+        <div class="status" id="model-status">
+          Loading in-browser models (embeddings + small LLM)… first time may take a bit.
+        </div>
+        <div class="pill" id="badge-emb">Embeddings: <span class="badge-loading">loading…</span></div>
+        <div class="pill" id="badge-llm">LLM: <span class="badge-loading">loading…</span></div>
+      </div>
+
+      <!-- PDF UPLOAD -->
+      <div class="section">
+        <div class="section-title">1. Upload PLC PDFs</div>
+        <input type="file" id="pdf-input" accept="application/pdf" multiple />
+        <button id="btn-process-pdfs" disabled>Process PDFs &amp; Build Knowledge Base</button>
+        <div class="status" id="pdf-status"></div>
+      </div>
+
+      <!-- CHAT -->
+      <div class="section">
+        <div class="section-title">2. Ask a Question</div>
+        <div class="row">
+          <div>
+            <input type="text" id="question-input" placeholder="e.g. What is a NO contact? How is a motor interlock done?" />
+            <button id="btn-ask" disabled>Ask</button>
+            <div class="status" id="qa-status"></div>
+          </div>
+        </div>
+        <div style="margin-top: 10px;">
+          <div style="font-size: 0.85rem; color:#6b7280; margin-bottom:4px;">
+            Answer:
+          </div>
+          <div class="answer-box" id="answer-box"></div>
+        </div>
+      </div>
+
+      <!-- DEBUG CONTEXT (to see what chunks were used) -->
+      <div class="section">
+        <div class="section-title">Retrieved Context (for debugging)</div>
+        <div class="debug-context" id="context-box">
+          No context yet. After you ask, you’ll see which PDF chunks the model used.
+        </div>
+      </div>
+
+      <div style="margin-top: 12px; font-size: 0.75rem; color:#6b7280;">
+        Runs fully in your browser using <code class="inline">pdf.js</code> and
+        <code class="inline">@xenova/transformers</code>. No API keys, no servers.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===== Global state =====
+    const { pipeline } = window.transformers;
+
+    let embeddingPipeline = null;
+    let generatorPipeline = null;
+
+    // Vector DB in memory: { embedding: Float32Array, text: string, source: string }
+    const vectorDB = [];
+
+    // UI elements
+    const modelStatusEl   = document.getElementById('model-status');
+    const pdfStatusEl     = document.getElementById('pdf-status');
+    const qaStatusEl      = document.getElementById('qa-status');
+    const pdfInput        = document.getElementById('pdf-input');
+    const btnProcessPDFs  = document.getElementById('btn-process-pdfs');
+    const btnAsk          = document.getElementById('btn-ask');
+    const questionInput   = document.getElementById('question-input');
+    const answerBox       = document.getElementById('answer-box');
+    const contextBox      = document.getElementById('context-box');
+    const badgeEmb        = document.getElementById('badge-emb');
+    const badgeLLM        = document.getElementById('badge-llm');
+
+    // ===== Utility: cos similarity =====
+    function cosineSimilarity(a, b) {
+      let dot = 0, na = 0, nb = 0;
+      for (let i = 0; i < a.length; i++) {
+        dot += a[i] * b[i];
+        na += a[i] * a[i];
+        nb += b[i] * b[i];
+      }
+      return dot / (Math.sqrt(na) * Math.sqrt(nb) + 1e-8);
+    }
+
+    // ===== Utility: chunking =====
+    function chunkText(text, chunkSize = 500, overlap = 100) {
+      const sentences = text.split(/(?<=[\.\?\!])\s+|\n+/);
+      const chunks = [];
+      let current = '';
+
+      for (const sent of sentences) {
+        if ((current + ' ' + sent).length > chunkSize) {
+          if (current.trim().length > 0) {
+            chunks.push(current.trim());
+          }
+          if (current.length > overlap) {
+            current = current.slice(current.length - overlap) + ' ' + sent;
+          } else {
+            current = sent;
+          }
+        } else {
+          current += ' ' + sent;
+        }
+      }
+      if (current.trim().length > 0) {
+        chunks.push(current.trim());
+      }
+      return chunks;
+    }
+
+    // ===== 1. Load models in browser =====
+    async function initModels() {
+      try {
+        modelStatusEl.textContent = "Loading embedding model (MiniLM)…";
+        badgeEmb.innerHTML = 'Embeddings: <span class="badge-loading">loading…</span>';
+
+        embeddingPipeline = await pipeline(
+          'feature-extraction',
+          'Xenova/all-MiniLM-L6-v2'
+        );
+
+        badgeEmb.innerHTML = 'Embeddings: <span class="badge-ready">ready</span>';
+
+        modelStatusEl.textContent = "Loading small instruction LLM (Qwen 0.5B)…";
+        badgeLLM.innerHTML = 'LLM: <span class="badge-loading">loading…</span>';
+
+        generatorPipeline = await pipeline(
+          'text-generation',
+          'Xenova/qwen2.5-0.5b-instruct'
+        );
+
+        badgeLLM.innerHTML = 'LLM: <span class="badge-ready">ready</span>';
+        modelStatusEl.textContent = "Models ready. Upload PDFs and build the knowledge base.";
+
+        btnProcessPDFs.disabled = false;
+      } catch (err) {
+        console.error(err);
+        modelStatusEl.textContent = "Error loading models. Check console. You may need a decent device & internet.";
+        badgeEmb.innerHTML = 'Embeddings: <span class="badge-error">error</span>';
+        badgeLLM.innerHTML = 'LLM: <span class="badge-error">error</span>';
+      }
+    }
+
+    initModels();
+
+    // ===== 2. Extract text from a PDF =====
+    async function extractTextFromPDF(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+
+      const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
+      const pdf = await loadingTask.promise;
+      let fullText = '';
+
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const content = await page.getTextContent();
+        const strings = content.items.map(item => item.str);
+        fullText += strings.join(' ') + '\n';
+      }
+      return fullText;
+    }
+
+    // ===== 3. Build vector DB from PDFs =====
+    async function buildKnowledgeBaseFromPDFs(files) {
+      if (!embeddingPipeline) {
+        pdfStatusEl.textContent = "Embedding model is not ready yet.";
+        return;
+      }
+      if (!files || files.length === 0) {
+        pdfStatusEl.textContent = "Please select at least one PDF.";
+        return;
+      }
+
+      vectorDB.length = 0;
+      answerBox.textContent = "";
+      contextBox.textContent = "Knowledge base rebuilt. Ask a question.";
+
+      pdfStatusEl.textContent = "Extracting text from PDFs…";
+
+      for (const file of files) {
+        const text = await extractTextFromPDF(file);
+        const cleaned = text.replace(/\s+/g, ' ').trim();
+        if (cleaned.length === 0) continue;
+
+        const chunks = chunkText(cleaned, 500, 100);
+        pdfStatusEl.textContent = `Processing "${file.name}" → ${chunks.length} chunks…`;
+
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i];
+
+          const embOutput = await embeddingPipeline(chunk, { pooling: 'mean', normalize: true });
+          const embArray = Array.from(embOutput.data || embOutput[0][0] || embOutput[0]);
+
+          vectorDB.push({
+            embedding: new Float32Array(embArray),
+            text: chunk,
+            source: file.name
+          });
+        }
+      }
+
+      pdfStatusEl.textContent = `Knowledge base ready. Total chunks: ${vectorDB.length}`;
+      btnAsk.disabled = false;
+    }
+
+    // ===== 4. Retrieve top-k similar chunks =====
+    function retrieveTopK(queryEmbedding, k = 3) {
+      const scores = vectorDB.map((item, idx) => {
+        return {
+          idx,
+          score: cosineSimilarity(queryEmbedding, item.embedding)
+        };
+      });
+
+      scores.sort((a, b) => b.score - a.score);
+      return scores.slice(0, Math.min(k, scores.length)).map(s => vectorDB[s.idx]);
+    }
+
+    // ===== 5. Generate answer with RAG =====
+    async function answerQuestion(question) {
+      if (!generatorPipeline) {
+        qaStatusEl.textContent = "LLM not ready yet.";
+        return;
+      }
+      if (vectorDB.length === 0) {
+        qaStatusEl.textContent = "Please upload PDFs and build the knowledge base first.";
+        return;
+      }
+
+      qaStatusEl.textContent = "Embedding question and retrieving relevant chunks…";
+
+      const qEmbOutput = await embeddingPipeline(question, { pooling: 'mean', normalize: true });
+      const qEmbArray = Array.from(qEmbOutput.data || qEmbOutput[0][0] || qEmbOutput[0]);
+      const qEmb = new Float32Array(qEmbArray);
+
+      const topChunks = retrieveTopK(qEmb, 3);
+
+      let ctxDebug = "";
+      topChunks.forEach((c, i) => {
+        ctxDebug += `#${i+1} [${c.source}]\n${c.text}\n\n`;
+      });
+      contextBox.textContent = ctxDebug || "No context retrieved.";
+
+      const contextText = topChunks.map(c => `From ${c.source}:\n${c.text}`).join("\n\n");
+
+      const prompt = `
+You are a PLC FAQ assistant.
+You must answer ONLY using the information in the context below.
+If the answer is not clearly contained in the context, you MUST reply exactly:
+"Information not found in the provided PLC documents."
+
+Context:
+${contextText}
+
+Question:
+${question}
+
+Answer:
+`.trim();
+
+      qaStatusEl.textContent = "Generating answer from the small LLM using the retrieved context…";
+      answerBox.textContent = "";
+
+      const output = await generatorPipeline(prompt, {
+        max_new_tokens: 256,
+        temperature: 0.1,
+        top_p: 0.9,
+        repetition_penalty: 1.1
+      });
+
+      let text;
+      if (Array.isArray(output)) {
+        text = output[0].generated_text || output[0].output_text || JSON.stringify(output[0]);
+      } else {
+        text = output.generated_text || output.output_text || JSON.stringify(output);
+      }
+
+      const answerPart = text.split("Answer:").slice(-1)[0].trim();
+
+      answerBox.textContent = answerPart;
+      qaStatusEl.textContent = "Done.";
+    }
+
+    // ===== Event handlers =====
+    btnProcessPDFs.addEventListener('click', async () => {
+      const files = pdfInput.files;
+      btnProcessPDFs.disabled = true;
+      btnAsk.disabled = true;
+      pdfStatusEl.textContent = "Starting PDF processing…";
+      try {
+        await buildKnowledgeBaseFromPDFs(files);
+      } catch (err) {
+        console.error(err);
+        pdfStatusEl.textContent = "Error while building knowledge base. Check console.";
+      } finally {
+        btnProcessPDFs.disabled = false;
+      }
+    });
+
+    btnAsk.addEventListener('click', async () => {
+      const q = questionInput.value.trim();
+      if (!q) {
+        qaStatusEl.textContent = "Please type a question.";
+        return;
+      }
+      btnAsk.disabled = true;
+      try {
+        await answerQuestion(q);
+      } catch (err) {
+        console.error(err);
+        qaStatusEl.textContent = "Error during answering. Check console.";
+      } finally {
+        btnAsk.disabled = false;
+      }
+    });
+
+    questionInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        btnAsk.click();
+      }
+    });
+  </script>
+</body>
+</html>
